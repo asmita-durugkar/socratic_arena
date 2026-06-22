@@ -37,8 +37,8 @@ Follow these steps to clone and run the project locally:
 
 1. **Clone the Repository:**
    
-   git clone https://github.com/asmita-durugkar/socratic_arena
-   cd YOUR_REPO_NAME
+   git clone https://github.com/asmita-durugkar/socratic_arena.git
+   cd socratic_arena
 2. **Install Dependencies:**
    Ensure you have Python installed, then run:
    ```bash
