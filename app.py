@@ -134,6 +134,31 @@ if not st.session_state.debate_started:
 else:
     # Lock the selections visually when active so changes don't corrupt runtime history
     st.sidebar.info("🔒 Arena active. Selection locked until current simulation resets.")
+import random
+
+# ==========================================
+# 6.5 SIDEBAR FUN FACTS (NEW)
+# ==========================================
+st.sidebar.markdown("---")
+st.sidebar.subheader("🧠 Did You Know?")
+
+fun_facts = [
+    "The Socratic Method is named after Socrates, who annoyed so many politicians with his questions that he was put on trial!",
+    "Thinking and arguing in a second language actually reduces emotional bias and makes you more logical.",
+    "The 'Strawman' fallacy—attacking a fake, weaker version of an argument—is the most common mistake made in amateur debates.",
+    "Employers consistently rank 'critical thinking' and 'clear articulation' above technical skills in leadership roles.",
+    "The Turing Test, proposed in 1950, was originally called the 'Imitation Game'. It was basically a text-based debate to see if a machine could successfully trick a human judge!",
+    "Your brain actually releases dopamine when you hear information that confirms what you already believe. This 'Confirmation Bias' makes it physically difficult to change your mind.",
+    "In ancient Athens, a water clock called a 'clepsydra' was used to time debates. If you kept talking after the water ran out, your argument was immediately cut off.",
+    "The 'Illusion of Explanatory Depth' is a psychological quirk where people believe they fully understand a topic—until they are asked to explain it step-by-step and realize their logic is flawed.",
+    "Communication studies show that pausing for just 3 seconds before answering a difficult question makes the audience perceive you as significantly smarter and more confident.",
+    "Large Language Models (like the ones powering your twin professors) don't actually 'think' in sentences. They calculate the mathematical probability of the next logical word token at lightning speed.",
+    "The most successful debaters don't actually talk faster; they use 'signposting'—clearly numbering their points (First, Second, Third) so the judge's brain can process the structure easier."
+]
+
+# Picks a random fact every time the user interacts
+st.sidebar.info(random.choice(fun_facts))    
+    
 
 # ==========================================
 # 7. USER INTERFACE LAYOUT
