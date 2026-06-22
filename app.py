@@ -1,295 +1,219 @@
 import streamlit as st
-from google import genai
-from google.genai import types
-import json
-import random
-import re
+import google.generativeai as genai
 
 # ==========================================
-# 1. Page Configuration & CSS
+# 1. PAGE SETUP & API CONFIGURATION
 # ==========================================
 st.set_page_config(
-    page_title="Socratic Defense Arena", 
-    page_icon="🎓", 
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="Socratic Defense Arena",
+    page_icon="🎓",
+    layout="centered"
 )
 
-st.markdown("""
-<style>
-    .badge-card {
-        background-color: #1E1E2E;
-        padding: 20px;
-        border-radius: 12px;
-        border: 2px solid #89B4FA;
-        text-align: center;
-        box-shadow: 0px 6px 15px rgba(0,0,0,0.4);
-        transition: transform 0.2s;
-        margin-bottom: 15px;
-    }
-    .badge-card:hover {
-        transform: scale(1.02);
-    }
-    .badge-title {
-        color: #CBA6F7;
-        font-size: 22px;
-        font-weight: bold;
-        margin-top: 10px;
-        margin-bottom: 5px;
-    }
-    .badge-desc {
-        color: #A6ADC8; 
-        margin: 0;
-        font-size: 14px;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-st.title("⚔️ Socratic Defense Arena")
-st.caption("Enter the Arena. Defeat the Professors. Level up your Critical Thinking!")
-
-# 🔑 SECURE API KEY INJECTION (For Streamlit Cloud & Local secrets.toml) 🔑
-MY_GEMINI_KEY = st.secrets["GEMINI_API_KEY"]
+# Fetch API key securely from Streamlit Secrets
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except Exception as e:
+    st.error("🔑 API Key not found! Please configure GEMINI_API_KEY in your secrets.")
+    st.stop()
 
 # ==========================================
-# 2. Database (Topics & Trivia)
+# 2. SYSTEM PROMPTS (THE CORE BRAINS)
 # ==========================================
-TOPIC_CATEGORIES = {
-    "🌐 Society & Tech": [
-        "Social media does more harm than good for teenagers",
-        "AI tools like ChatGPT make students lazy instead of smarter",
-        "Video games actively help develop teamwork and strategic thinking"
-    ],
-    "🧬 Ethics & Life": [
-        "Schools should completely ban homework to protect student mental health",
-        "Money can buy happiness if spent on experiences rather than items",
-        "All public transport inside major cities should be completely free"
-    ],
-    "🎬 Pop Culture & Influencers": [
-        "Social media influencers earn massive amounts of money without doing any real work",
-        "Professional athletes are paid way too much money compared to essential workers",
-        "Movies are better watched alone at home than inside a crowded cinema"
-    ]
-}
 
-FUN_FACTS = [
-    "The ancient Greeks invented the Socratic method over 2,400 years ago to break down hidden assumptions through questions instead of boring lectures!",
-    "In ancient Rome, public live debates were treated like modern sports matches—crowds would pack stadiums to cheer on their favorite speakers.",
-    "The word 'Debate' comes from the Old French word 'debatre', which literally translates to 'fight or beat down'—but cleanly with words!",
-    "Philosopher Socrates never actually wrote down his ideas. Everything we know about him comes from dialogues recorded by his student, Plato.",
-    "The 1960 Kennedy-Nixon debate changed media forever: radio listeners thought Nixon won, but TV viewers chose Kennedy because he looked calmer!",
-    "Scientific studies show that participating in structured debates boosts a student's active critical thinking metrics by up to 44% more than standard textbook reading."
-]
+PROFESSOR_SKEPTIC_PROMPT = """
+You are Professor Skeptic, a brilliant, ruthlessly sharp academic contrarian. Your job is to audit the student's stance using the classic Socratic method.
+- Target cognitive biases, logical fallacies (circular reasoning, ad hominem, strawman), and unverified assumptions.
+- Respond dynamically in the SAME language the student uses (English, Hindi, Marathi, or Hinglish/Minglish). Keep your language natural yet intellectually challenging.
+- Keep responses concise (under 80 words) and end with one sharp, probing question.
 
-# ==========================================
-# 3. Sidebar Configuration
-# ==========================================
-with st.sidebar:
-    st.header("🎮 Level Select")
-    category = st.selectbox("Select Campaign Track", list(TOPIC_CATEGORIES.keys()))
-    topic = st.selectbox("Choose Your Mission", TOPIC_CATEGORIES[category])
-    start_btn = st.button("🔄 Start New Match", use_container_width=True)
-    
-    st.write("---")
-    
-    st.markdown("### 💡 Did You Know?")
-    if "current_fact" not in st.session_state or start_btn:
-        st.session_state.current_fact = random.choice(FUN_FACTS)
-    st.info(st.session_state.current_fact)
-
-# ==========================================
-# 4. System Logic & API Connection
-# ==========================================
-SYSTEM_INSTRUCTION = f"""
-You are conducting a friendly but critical academic debate with a student on the topic: '{topic}'.
-There are two personas here:
-1. Professor Skeptic: Questions assumptions and points out logical flaws.
-2. Professor Realist: Asks how the student's idea works out in day-to-day life.
-
-CRITICAL RULES:
-- Do NOT demand research papers, scientific journals, or specific data references.
-- Accept personal life experiences, logical analogies, common sense, and philosophical reasoning.
-- Keep your combined response brief (under 4 sentences total). Take turns naturally.
--ALWAYS reply in the exact same language the student uses (English, Hindi, or Marathi).
+CRITICAL DISMISSAL SYSTEM:
+Evaluate the student's argument trajectory closely. You must strictly append one of these tags to the absolute end of your response if conditions are met:
+1. If the student has defended their stance logically and robustly for at least 2 rounds, append: [DEBATE_STATUS: SUCCESS]
+2. If the student's arguments are circular, unstructured, or failing to make sense after 3 rounds, append: [DEBATE_STATUS: TERMINATE]
+Otherwise, do not add any tags.
 """
 
-def get_gemini_client():
-    return genai.Client(api_key=MY_GEMINI_KEY)
+PROFESSOR_REALIST_PROMPT = """
+You are Professor Realist, a pragmatic, data-driven academic evaluator. Your job is to challenge the student's stance using real-world constraints.
+- Push back using empirical evidence, practical implementation challenges, economic feasibility, and historical data boundaries.
+- Respond dynamically in the SAME language the student uses (English, Hindi, Marathi, or Hinglish/Minglish). Keep your language realistic and challenging.
+- Keep responses concise (under 80 words) and end with one sharp, probing question.
 
-def call_gemini_with_fallback(client, contents, system_instruction=None, json_mode=False):
-    # Testing the most stable, active models
-    models_to_try = [
-        'gemini-2.5-flash',
-        'gemini-2.0-flash', 
-        'gemini-1.5-flash-8b',
-        'gemini-1.5-flash'
-    ] 
-    
-    config_args = {"temperature": 0.7}
-    if system_instruction:
-        config_args["system_instruction"] = system_instruction
-    if json_mode:
-        config_args["response_mime_type"] = "application/json"
-        
-    config = types.GenerateContentConfig(**config_args)
-    
-    # We will store ALL errors here so we can see exactly what is blocking us
-    error_logs = []
-    
-    for model_name in models_to_try:
+CRITICAL DISMISSAL SYSTEM:
+Evaluate the student's argument trajectory closely. You must strictly append one of these tags to the absolute end of your response if conditions are met:
+1. If the student has defended their stance logically and robustly for at least 2 rounds, append: [DEBATE_STATUS: SUCCESS]
+2. If the student's arguments are circular, unstructured, or failing to make sense after 3 rounds, append: [DEBATE_STATUS: TERMINATE]
+Otherwise, do not add any tags.
+"""
+
+AI_JUDGE_PROMPT = """
+You are the Impartial AI Judge. Your task is to analyze the complete transcript of the Socratic debate and output a detailed, structured performance scorecard.
+Evaluate the student objectively across these three metrics on a scale of 1-10:
+1. **Logical Structure:** Did they maintain a consistent thesis and avoid basic fallacies?
+2. **Empirical Grounding:** Did they attempt to back up claims with solid reasoning, facts, or data boundaries?
+3. **Clarity & Articulation Mastery:** Evaluate how well they structured sentences under pressure. Point out where they fumbled or lost structural focus, and explain how this preparation helps them shed anxiety for college presentations and placement interviews.
+
+Format your output beautifully using clear Markdown headings, bullet points, and high-impact blockquotes. Be constructive but honest.
+"""
+
+# ==========================================
+# 3. SESSION STATE MANAGEMENT
+# ==========================================
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "turn_count" not in st.session_state:
+    st.session_state.turn_count = 0
+if "debate_over" not in st.session_state:
+    st.session_state.debate_over = False
+if "debate_started" not in st.session_state:
+    st.session_state.debate_started = False
+if "termination_type" not in st.session_state:
+    st.session_state.termination_type = None
+
+# ==========================================
+# 4. HELPER FUNCTIONS
+# ==========================================
+def get_llm_response(system_prompt, conversation_history):
+    """Orchestrates native Gemini API model generation with specific system contexts."""
+    try:
+        model = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            system_instruction=system_prompt
+        )
+        response = model.generate_content(conversation_history)
+        return response.text
+    except Exception:
+        # Fallback to 2.0 if 2.5 hits a temporary server traffic spike
         try:
-            response = client.models.generate_content(
-                model=model_name,
-                contents=contents,
-                config=config
+            model = genai.GenerativeModel(
+                model_name="gemini-2.0-flash",
+                system_instruction=system_prompt
             )
+            response = model.generate_content(conversation_history)
             return response.text
         except Exception as e:
-            error_logs.append(f"[{model_name}]: {str(e)}")
-            continue
-            
-    # If everything fails, print the full list of reasons!
-    return "API ERROR LOG:\n" + "\n".join(error_logs)
+            return f"⚠️ Connection error: {str(e)}. Please click submit again."
+
+def build_raw_transcript():
+    """Compiles clean conversational logs for the isolated AI Judge pipeline."""
+    transcript = ""
+    for msg in st.session_state.messages:
+        role_label = "Student" if msg["role"] == "user" else msg["agent_name"]
+        transcript += f"{role_label}: {msg['content']}\n\n"
+    return transcript
 
 # ==========================================
-# 5. Live Chat State Management
+# 5. USER INTERFACE LAYOUT
 # ==========================================
-if "chat_history" not in st.session_state or start_btn:
-    st.session_state.chat_history = []
-    st.session_state.display_history = []
-    st.session_state.exam_finished = False
+st.title("🎓 Socratic Defense Arena")
+st.write("Challenge your logic, eliminate fumbling, and build presentation-ready communication confidence.")
+st.markdown("---")
+
+# Step 1: Stance Setup Screen
+if not st.session_state.debate_started:
+    st.subheader("💡 Set Your Stance")
+    st.info("You can type your opinion in English, हिन्दी, मराठी, or Hinglish/Minglish!")
     
-    client = get_gemini_client()
-    with st.spinner("⚔️ Professors are drawing their opening cards..."):
-        welcome_prompt = f"Welcome the student warmly to the debate arena on '{topic}'. Challenge them to step up and make their first move!"
-        initial_greeting = call_gemini_with_fallback(client, welcome_prompt, SYSTEM_INSTRUCTION)
-        
-        st.session_state.display_history.append({"role": "assistant", "content": initial_greeting})
-        st.session_state.chat_history.append(types.Content(role="model", parts=[types.Part.from_text(text=initial_greeting)]))
+    topic = st.text_input("Enter the topic you want to debate (e.g., 'Social media does more harm than good'):")
+    stance = st.text_area("What is your initial argument or viewpoint on this topic?")
+    
+    if st.button("🚀 Enter Arena", use_container_width=True):
+        if topic.strip() and stance.strip():
+            st.session_state.debate_started = True
+            # Seed the initial state with user argument
+            st.session_state.messages.append({"role": "user", "content": f"Topic: {topic}\nMy Stance: {stance}"})
+            st.session_state.turn_count += 1
+            
+            # Trigger Professor Skeptic for the opening challenge
+            with st.spinner("Professor Skeptic is analyzing your logic..."):
+                initial_history = f"Topic: {topic}\nStudent Opening Stance: {stance}"
+                raw_reply = get_llm_response(PROFESSOR_SKEPTIC_PROMPT, initial_history)
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "agent_name": "Professor Skeptic", 
+                    "avatar": "🕵️‍♂️", 
+                    "content": raw_reply
+                })
+            st.rerun()
+        else:
+            st.warning("Please fill out both fields before entering the arena.")
 
-# Render Live Chat Stream
-for msg in st.session_state.display_history:
-    with st.chat_message(msg["role"], avatar="🤖" if msg["role"] == "assistant" else None):
-        st.write(msg["content"])
+# Step 2: The Active Arena Screen
+else:
+    # Render historical back-and-forth dialogue using conversational components
+    for msg in st.session_state.messages:
+        avatar = msg.get("avatar", "👤")
+        with st.chat_message(msg["role"], avatar=avatar):
+            if msg["role"] != "user":
+                st.caption(f"**{msg['agent_name']}**")
+            st.write(msg["content"])
 
-# User Input Logic
-if not st.session_state.exam_finished:
-    if user_input := st.chat_input("Strike back with your argument here..."):
-        client = get_gemini_client()
-        
-        with st.chat_message("user"):
-            st.write(user_input)
-            
-        st.session_state.display_history.append({"role": "user", "content": user_input})
-        st.session_state.chat_history.append(types.Content(role="user", parts=[types.Part.from_text(text=user_input)]))
-        
-        with st.chat_message("assistant", avatar="🤖"):
-            with st.spinner("Professors are calculating counter-defenses..."):
-                ai_reply = call_gemini_with_fallback(client, st.session_state.chat_history, SYSTEM_INSTRUCTION)
-                st.write(ai_reply)
-                
-                st.session_state.display_history.append({"role": "assistant", "content": ai_reply})
-                st.session_state.chat_history.append(types.Content(role="model", parts=[types.Part.from_text(text=ai_reply)]))
+    # Active Loop Guard: Accept inputs only if AI has not fired termination flags
+    if not st.session_state.debate_over:
+        if user_input := st.chat_input("Type your logical defense here..."):
+            # Append student input to state
+            st.session_state.messages.append({"role": "user", "avatar": "👤", "content": user_input})
+            st.session_state.turn_count += 1
+            st.rerun()
 
-# ==========================================
-# 6. Gamified Analytics Dashboard
-# ==========================================
-if len(st.session_state.display_history) > 1 and not st.session_state.exam_finished:
-    st.write("")
-    if st.button("🏆 End Match & Claim Rewards", use_container_width=True):
-        st.session_state.exam_finished = True
-        client = get_gemini_client()
-        
-        with st.spinner("🧙‍♂️ The Elder Judges are tallying your experience points..."):
-            transcript = ""
-            for msg in st.session_state.display_history:
-                transcript += f"{msg['role'].upper()}: {msg['content']}\n\n"
-            
-            judge_prompt = f"""
-            Analyze this debate transcript. You must calculate gamified metrics for a student.
-            Assign one of these three Titles based on overall performance: "Socratic Knight" (85+), "Logic Squire" (65-84), or "Philosophy Peasant" (<65).
-            Assign one Badge out of these based on their best trait: "Shield of Logic", "Silver Tongue", or "Unshakable Mind".
-            
-            Output raw JSON matching this structure exactly:
-            {{
-              "logic_score": 85,
-              "rhetoric_score": 78,
-              "confidence_score": 92,
-              "overall_xp": 2550,
-              "title": "Logic Squire",
-              "badge": "Shield of Logic",
-              "superpower": "Great job standing your ground against the Realist.",
-              "weakness": "Watch out for emotional traps set by the Skeptic."
-            }}
-            
-            TRANSCRIPT:
-            {transcript}
-            """
-            
-            raw_json = call_gemini_with_fallback(client, judge_prompt, json_mode=True)
-            
-            # Clean the AI output using Regular Expressions
-            match = re.search(r'\{.*\}', raw_json, re.DOTALL)
-            
-            try:
-                if match:
-                    clean_json_string = match.group(0)
-                else:
-                    clean_json_string = raw_json 
+        # Check if the last message came from the user; if so, trigger alternating professor orchestration
+        if st.session_state.messages[-1]["role"] == "user":
+            # Decide who cross-examines next based on the turn count
+            if st.session_state.turn_count % 2 == 0:
+                current_professor = "Professor Skeptic"
+                current_prompt = PROFESSOR_SKEPTIC_PROMPT
+                current_avatar = "🕵️‍♂️"
+            else:
+                current_professor = "Professor Realist"
+                current_prompt = PROFESSOR_REALIST_PROMPT
+                current_avatar = "📊"
+
+            with st.chat_message("assistant", avatar=current_avatar):
+                st.caption(f"**{current_professor}**")
+                with st.spinner(f"{current_professor} is processing your response..."):
+                    history_context = build_raw_transcript()
+                    raw_reply = get_llm_response(current_prompt, history_context)
                     
-                data = json.loads(clean_json_string)
+                    # Token-Triggered Termination Scanning Logic
+                    if "[DEBATE_STATUS: SUCCESS]" in raw_reply:
+                        st.session_state.debate_over = True
+                        st.session_state.termination_type = "SUCCESS"
+                        raw_reply = raw_reply.replace("[DEBATE_STATUS: SUCCESS]", "").strip()
+                        
+                    elif "[DEBATE_STATUS: TERMINATE]" in raw_reply:
+                        st.session_state.debate_over = True
+                        st.session_state.termination_type = "TERMINATE"
+                        raw_reply = raw_reply.replace("[DEBATE_STATUS: TERMINATE]", "").strip()
 
-                st.balloons()
-                st.snow()
-                
-                st.markdown("## 📊 ARENA MATCH SUMMARY")
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.markdown(f"""
-                    <div class="badge-card">
-                        <div style="font-size: 45px;">🏆</div>
-                        <div class="badge-title">{data.get('title', 'Unranked')}</div>
-                        <p class="badge-desc">Your Earned Rank Tier</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                with col2:
-                    st.markdown(f"""
-                    <div class="badge-card">
-                        <div style="font-size: 45px;">🛡️</div>
-                        <div class="badge-title">{data.get('badge', 'Novice')}</div>
-                        <p class="badge-desc">Special Attribute Unlocked</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                with col3:
-                    st.markdown(f"""
-                    <div class="badge-card">
-                        <div style="font-size: 45px;">✨</div>
-                        <div class="badge-title">+{data.get('overall_xp', 0)} XP</div>
-                        <p class="badge-desc">Total Experience Points Gathered</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                st.write("---")
-                st.markdown("### 📈 Core Stat Attributes")
-                
-                m1, m2, m3 = st.columns(3)
-                with m1:
-                    st.metric(label="🧠 Logic Matrix Level", value=f"{data.get('logic_score', 0)}/100")
-                with m2:
-                    st.metric(label="🗣️ Rhetoric Power Level", value=f"{data.get('rhetoric_score', 0)}/100")
-                with m3:
-                    st.metric(label="🔋 Emotional Stamina Level", value=f"{data.get('confidence_score', 0)}/100")
-                
-                st.write("---")
-                
-                left_box, right_box = st.columns(2)
-                with left_box:
-                    st.success(f"🔥 Class Superpower Activated:\n\n{data.get('superpower', 'Analysis pending.')}")
-                with right_box:
-                    st.warning(f"⚠️ Debuff / Vulnerability Spotted:\n\n{data.get('weakness', 'Analysis pending.')}")
-                    
-            except Exception as parse_error:
-                st.error("Dashboard compilation failed. The AI returned an invalid format.")
-                st.write("Here is what the AI actually sent back:")
-                st.code(raw_json)
+                    st.write(raw_reply)
+                    st.session_state.messages.append({
+                        "role": "assistant", 
+                        "agent_name": current_professor, 
+                        "avatar": current_avatar, 
+                        "content": raw_reply
+                    })
+            
+            if st.session_state.debate_over:
+                st.rerun()
+
+    # Step 3: Decoupled AI Judge Pipeline Execution
+    else:
+        st.markdown("---")
+        if st.session_state.termination_type == "SUCCESS":
+            st.success("🎉 **Debate Concluded!** The professors acknowledge your structural logic. The execution state is locking down.")
+        else:
+            st.warning("⚠️ **Debate Concluded!** The dialogue is loop-locking or losing structural focus. The loop has been halted.")
+
+        st.subheader("⚖️ Decoupled AI Judge Evaluation Pipeline")
+        
+        with st.spinner("The AI Judge is reviewing complete session logs against the performance rubric..."):
+            full_transcript = build_raw_transcript()
+            judge_scorecard = get_llm_response(AI_JUDGE_PROMPT, full_transcript)
+            
+            st.markdown(judge_scorecard)
+            
+        # Provide option to restart the arena simulation
+        if st.button("🔄 Reset Arena & Start New Match", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
