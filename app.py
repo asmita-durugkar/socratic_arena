@@ -110,6 +110,7 @@ CRITICAL RULES:
 - Do NOT demand research papers, scientific journals, or specific data references.
 - Accept personal life experiences, logical analogies, common sense, and philosophical reasoning.
 - Keep your combined response brief (under 4 sentences total). Take turns naturally.
+-ALWAYS reply in the exact same language the student uses (English, Hindi, or Marathi).
 """
 
 def get_gemini_client():
