@@ -38,20 +38,21 @@ Follow these steps to clone and run the project locally:
 1. **Clone the Repository:**
    
    git clone https://github.com/asmita-durugkar/socratic_arena.git
+   
    cd socratic_arena
-2. **Install Dependencies:**
+3. **Install Dependencies:**
    Ensure you have Python installed, then run:
    ```bash
    pip install -r requirements.txt
 
-3. **Configure Environment Secrets:**
+4. **Configure Environment Secrets:**
    * **For Local Development:** Create a `.streamlit/secrets.toml` file in your root directory and add your API key:
      ```toml
      GEMINI_API_KEY = "your_api_key_here"
      ```
    * **For Streamlit Cloud Deployment:** Add `GEMINI_API_KEY = "your_api_key_here"` directly under the **Secrets** section in your Streamlit Advanced App Settings dashboard.
 
-4. **Run the Application:**
+5. **Run the Application:**
    ```bash
    streamlit run app.py
    
