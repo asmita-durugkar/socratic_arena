@@ -18,7 +18,28 @@ except Exception as e:
     st.stop()
 
 # ==========================================
-# 2. SYSTEM PROMPTS (THE CORE BRAINS)
+# 2. PRESET DEBATE TRACKS & TOPICS DATA
+# ==========================================
+DEBATE_TRACKS = {
+    "🚀 Technology & AI": [
+        "AI chatbots do more harm than good in modern classrooms.",
+        "Social media algorithms should be legally regulated to protect attention spans.",
+        "Artificial Intelligence will create far more career opportunities than it destroys."
+    ],
+    "⚖️ Ethics & Society": [
+        "A formal college degree is no longer a requirement for true financial success.",
+        "Universal Basic Income is absolutely necessary in an automated economy.",
+        "Slowing economic growth is a fair price to pay to stop global climate change."
+    ],
+    "🎓 Education & Competitions": [
+        "Traditional examinations completely fail to measure a student's actual intelligence.",
+        "Public speaking and debate training should be mandatory core subjects in every college.",
+        "Remote or online learning is fundamentally less effective than in-person classroom education."
+    ]
+}
+
+# ==========================================
+# 3. SYSTEM PROMPTS (THE CORE BRAINS)
 # ==========================================
 
 PROFESSOR_SKEPTIC_PROMPT = """
@@ -58,7 +79,7 @@ Format your output beautifully using clear Markdown headings, bullet points, and
 """
 
 # ==========================================
-# 3. SESSION STATE MANAGEMENT
+# 4. SESSION STATE MANAGEMENT
 # ==========================================
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -72,7 +93,7 @@ if "termination_type" not in st.session_state:
     st.session_state.termination_type = None
 
 # ==========================================
-# 4. HELPER FUNCTIONS
+# 5. HELPER FUNCTIONS
 # ==========================================
 def get_llm_response(system_prompt, conversation_history):
     """Orchestrates native Gemini API model generation with specific system contexts."""
@@ -84,7 +105,6 @@ def get_llm_response(system_prompt, conversation_history):
         response = model.generate_content(conversation_history)
         return response.text
     except Exception:
-        # Fallback to 2.0 if 2.5 hits a temporary server traffic spike
         try:
             model = genai.GenerativeModel(
                 model_name="gemini-2.0-flash",
@@ -104,7 +124,19 @@ def build_raw_transcript():
     return transcript
 
 # ==========================================
-# 5. USER INTERFACE LAYOUT
+# 6. SIDEBAR TRACK SELECTION CONFIGURATION
+# ==========================================
+st.sidebar.title("🎯 Choose Your Track")
+
+if not st.session_state.debate_started:
+    selected_track = st.sidebar.selectbox("Select a Domain Track:", list(DEBATE_TRACKS.keys()))
+    selected_topic = st.sidebar.selectbox("Choose a Premise / Topic:", DEBATE_TRACKS[selected_track])
+else:
+    # Lock the selections visually when active so changes don't corrupt runtime history
+    st.sidebar.info("🔒 Arena active. Selection locked until current simulation resets.")
+
+# ==========================================
+# 7. USER INTERFACE LAYOUT
 # ==========================================
 st.title("🎓 Socratic Defense Arena")
 st.write("Challenge your logic, eliminate fumbling, and build presentation-ready communication confidence.")
@@ -115,19 +147,19 @@ if not st.session_state.debate_started:
     st.subheader("💡 Set Your Stance")
     st.info("You can type your opinion in English, हिन्दी, मराठी, or Hinglish/Minglish!")
     
-    topic = st.text_input("Enter the topic you want to debate (e.g., 'Social media does more harm than good'):")
+    # Visual reference to what was chosen in the sidebar track
+    st.markdown(f"**Selected Topic:** `{selected_topic}`")
     stance = st.text_area("What is your initial argument or viewpoint on this topic?")
     
     if st.button("🚀 Enter Arena", use_container_width=True):
-        if topic.strip() and stance.strip():
+        if stance.strip():
             st.session_state.debate_started = True
-            # Seed the initial state with user argument
-            st.session_state.messages.append({"role": "user", "content": f"Topic: {topic}\nMy Stance: {stance}"})
+            # Seed state with the chosen topic and user argument
+            st.session_state.messages.append({"role": "user", "content": f"Topic: {selected_topic}\nMy Stance: {stance}"})
             st.session_state.turn_count += 1
             
-            # Trigger Professor Skeptic for the opening challenge
             with st.spinner("Professor Skeptic is analyzing your logic..."):
-                initial_history = f"Topic: {topic}\nStudent Opening Stance: {stance}"
+                initial_history = f"Topic: {selected_topic}\nStudent Opening Stance: {stance}"
                 raw_reply = get_llm_response(PROFESSOR_SKEPTIC_PROMPT, initial_history)
                 st.session_state.messages.append({
                     "role": "assistant", 
@@ -137,7 +169,7 @@ if not st.session_state.debate_started:
                 })
             st.rerun()
         else:
-            st.warning("Please fill out both fields before entering the arena.")
+            st.warning("Please type your argument/viewpoint before entering the arena.")
 
 # Step 2: The Active Arena Screen
 else:
@@ -152,14 +184,12 @@ else:
     # Active Loop Guard: Accept inputs only if AI has not fired termination flags
     if not st.session_state.debate_over:
         if user_input := st.chat_input("Type your logical defense here..."):
-            # Append student input to state
             st.session_state.messages.append({"role": "user", "avatar": "👤", "content": user_input})
             st.session_state.turn_count += 1
             st.rerun()
 
-        # Check if the last message came from the user; if so, trigger alternating professor orchestration
+        # Check if the last message came from the user; trigger alternating professor orchestration
         if st.session_state.messages[-1]["role"] == "user":
-            # Decide who cross-examines next based on the turn count
             if st.session_state.turn_count % 2 == 0:
                 current_professor = "Professor Skeptic"
                 current_prompt = PROFESSOR_SKEPTIC_PROMPT
