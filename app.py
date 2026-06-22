@@ -48,7 +48,7 @@ st.markdown("""
 st.title("⚔️ Socratic Defense Arena")
 st.caption("Enter the Arena. Defeat the Professors. Level up your Critical Thinking!")
 
-# 🔑 SECURE EMBEDDED HACKATHON API KEY 🔑
+# 🔑 SECURE API KEY INJECTION (For Streamlit Cloud & Local secrets.toml) 🔑
 MY_GEMINI_KEY = st.secrets["GEMINI_API_KEY"]
 
 # ==========================================
@@ -116,11 +116,11 @@ def get_gemini_client():
     return genai.Client(api_key=MY_GEMINI_KEY)
 
 def call_gemini_with_fallback(client, contents, system_instruction=None, json_mode=False):
-    # Updated to loop through the active models to bypass 404 errors
+    # Testing the most stable, active models
     models_to_try = [
+        'gemini-2.5-flash',
         'gemini-2.0-flash', 
-        'gemini-2.5-flash', 
-        'gemini-1.5-pro',
+        'gemini-1.5-flash-8b',
         'gemini-1.5-flash'
     ] 
     
@@ -131,7 +131,9 @@ def call_gemini_with_fallback(client, contents, system_instruction=None, json_mo
         config_args["response_mime_type"] = "application/json"
         
     config = types.GenerateContentConfig(**config_args)
-    last_error_message = ""
+    
+    # We will store ALL errors here so we can see exactly what is blocking us
+    error_logs = []
     
     for model_name in models_to_try:
         try:
@@ -142,10 +144,11 @@ def call_gemini_with_fallback(client, contents, system_instruction=None, json_mo
             )
             return response.text
         except Exception as e:
-            last_error_message = f"{model_name} failed: {str(e)}"
+            error_logs.append(f"[{model_name}]: {str(e)}")
             continue
             
-    return f"API ERROR LOG: {last_error_message}"
+    # If everything fails, print the full list of reasons!
+    return "API ERROR LOG:\n" + "\n".join(error_logs)
 
 # ==========================================
 # 5. Live Chat State Management
@@ -224,7 +227,7 @@ if len(st.session_state.display_history) > 1 and not st.session_state.exam_finis
             
             raw_json = call_gemini_with_fallback(client, judge_prompt, json_mode=True)
             
-            # --- THE FIX: Clean the AI output using Regular Expressions ---
+            # Clean the AI output using Regular Expressions
             match = re.search(r'\{.*\}', raw_json, re.DOTALL)
             
             try:
@@ -234,7 +237,6 @@ if len(st.session_state.display_history) > 1 and not st.session_state.exam_finis
                     clean_json_string = raw_json 
                     
                 data = json.loads(clean_json_string)
-                # -------------------------------------------------------------
 
                 st.balloons()
                 st.snow()
