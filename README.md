@@ -36,10 +36,11 @@ The platform features an innate language-fluid design driven directly by its adv
 Follow these steps to clone and run the project locally:
 
 1. **Clone the Repository:**
-   
+   ```bash
    git clone https://github.com/asmita-durugkar/socratic_arena.git
    
    cd socratic_arena
+   
 3. **Install Dependencies:**
    Ensure you have Python installed, then run:
    ```bash
