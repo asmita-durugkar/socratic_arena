@@ -11,7 +11,6 @@ st.set_page_config(
     layout="centered"
 )
 
-# Fetch API key securely from Streamlit Secrets
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 except Exception as e:
@@ -19,7 +18,7 @@ except Exception as e:
     st.stop()
 
 # ==========================================
-# 2. PRESET DATA & BACKUP FAIL-SAFES
+# 2. PRESET DATA & SOFT BACKUP FAIL-SAFES
 # ==========================================
 DEBATE_TRACKS = {
     "🚀 Technology & AI": [
@@ -39,63 +38,62 @@ DEBATE_TRACKS = {
     ]
 }
 
-# The Fallback Data if the live presentation hits a 429 Quota Error
 BACKUP_PROF_REPLY = """
-That is a common perspective, but it overlooks key structural dynamics. While you argue that this model is optimal, you must account for systemic constraints and behavioral friction. How do you plan to scale this logic without succumbing to the exact fallacies we just discussed?
+That is a strong point, but you are overlooking the practical side. Building and maintaining perfect systems takes time and money. How do we ensure this doesn't cost a fortune while still being effective?
 
 [DEBATE_STATUS: TERMINATE]"""
 
 BACKUP_JUDGE_SCORECARD = """
-# ⚖️ Impartial AI Judge Evaluation Scorecard (Simulation Mode)
+# ⚖️ Impartial AI Judge Evaluation Scorecard
 
-> **Note to Evaluator:** The live API hit a standard rate limit due to concurrent traffic. The application gracefully caught the error using our decoupled pipeline and generated this structured offline report.
+> **Note:** The live API hit a standard rate limit. The application gracefully caught the error and generated this offline report.
 
 ### 📊 Performance Analytics
-* **Logical Structure:** 8/10 — The thesis remained consistent through initial pushback.
-* **Empirical Grounding:** 7/10 — Strong analytical structure, though practical metrics require refinement.
-* **Clarity & Articulation Mastery:** 8/10 — Excellent sentence pacing under cross-examination pressure.
+* **Logical Structure:** 8/10 — You kept your main point consistent when challenged.
+* **Empirical Grounding:** 7/10 — Good logic, but try to use more real-world examples next time.
+* **Clarity & Articulation Mastery:** 9/10 — Very clear, confident, and easy to understand.
 
 ### 📝 Strategic Feedback
-Your ability to pivot when challenged was highly effective. To scale your communication skills for high-stakes placement interviews, work on eliminating filler transitions and ensuring each point explicitly links back to your overarching thesis.
+Great job pivoting when Professor Realist pushed back. For future placement interviews, keep focusing on practical, real-world solutions. Your ability to simplify complex topics is a major strength.
 """
 
 # ==========================================
-# 3. SYSTEM PROMPTS (THE CORE BRAINS)
+# 3. SOFTENED SYSTEM PROMPTS (THE COACHES)
 # ==========================================
 PROFESSOR_SKEPTIC_PROMPT = """
-You are Professor Skeptic, a brilliant, ruthlessly sharp academic contrarian. Your job is to audit the student's stance using the classic Socratic method.
-- Target cognitive biases, logical fallacies (circular reasoning, ad hominem, strawman), and unverified assumptions.
-- Respond dynamically in the SAME language the student uses (English, Hindi, Marathi, or Hinglish/Minglish). Keep your language natural yet intellectually challenging.
-- Keep responses concise (under 80 words) and end with one sharp, probing question.
+You are Professor Skeptic, a supportive but sharp interview coach preparing engineering students for corporate placements.
+- Your job is to test their logic gently but firmly. Ask practical, straightforward questions. 
+- Avoid overly academic or philosophical jargon. Speak like a modern hiring manager.
+- Respond dynamically in the SAME language the student uses (English, Hindi, Marathi, or Hinglish/Minglish). 
+- Keep responses concise (under 80 words) and end with one clear question.
 
 CRITICAL DISMISSAL SYSTEM:
-Evaluate the student's argument trajectory closely. You must strictly append one of these tags to the absolute end of your response if conditions are met:
-1. If the student has defended their stance logically and robustly for at least 2 rounds, append: [DEBATE_STATUS: SUCCESS]
-2. If the student's arguments are circular, unstructured, or failing to make sense after 3 rounds, append: [DEBATE_STATUS: TERMINATE]
-Otherwise, do not add any tags.
+1. If the student defends their stance logically for at least 2 rounds, append: [DEBATE_STATUS: SUCCESS]
+2. If their arguments are repeating or losing focus after 3 rounds, append: [DEBATE_STATUS: TERMINATE]
+Otherwise, do not add tags.
 """
 
 PROFESSOR_REALIST_PROMPT = """
-You are Professor Realist, a pragmatic, data-driven academic evaluator. Your job is to challenge the student's stance using real-world constraints.
-- Push back using empirical evidence, practical implementation challenges, economic feasibility, and historical data boundaries.
-- Respond dynamically in the SAME language the student uses (English, Hindi, Marathi, or Hinglish/Minglish). Keep your language realistic and challenging.
-- Keep responses concise (under 80 words) and end with one sharp, probing question.
+You are Professor Realist, a pragmatic, data-driven mentor preparing students for the corporate world.
+- Challenge their ideas using real-world constraints like budget, time, and implementation difficulty.
+- Avoid overly academic jargon. Speak like a friendly but strict project manager.
+- Respond dynamically in the SAME language the student uses (English, Hindi, Marathi, or Hinglish/Minglish). 
+- Keep responses concise (under 80 words) and end with one clear question.
 
 CRITICAL DISMISSAL SYSTEM:
-Evaluate the student's argument trajectory closely. You must strictly append one of these tags to the absolute end of your response if conditions are met:
-1. If the student has defended their stance logically and robustly for at least 2 rounds, append: [DEBATE_STATUS: SUCCESS]
-2. If the student's arguments are circular, unstructured, or failing to make sense after 3 rounds, append: [DEBATE_STATUS: TERMINATE]
-Otherwise, do not add any tags.
+1. If the student defends their stance logically for at least 2 rounds, append: [DEBATE_STATUS: SUCCESS]
+2. If their arguments are repeating or losing focus after 3 rounds, append: [DEBATE_STATUS: TERMINATE]
+Otherwise, do not add tags.
 """
 
 AI_JUDGE_PROMPT = """
-You are the Impartial AI Judge. Your task is to analyze the complete transcript of the Socratic debate and output a detailed, structured performance scorecard.
+You are the Impartial AI Judge, acting as a supportive career counselor. Analyze the transcript and output a scorecard.
 Evaluate the student objectively across these three metrics on a scale of 1-10:
-1. **Logical Structure:** Did they maintain a consistent thesis and avoid basic fallacies?
-2. **Empirical Grounding:** Did they attempt to back up claims with solid reasoning, facts, or data boundaries?
-3. **Clarity & Articulation Mastery:** Evaluate how well they structured sentences under pressure. Point out where they fumbled or lost structural focus, and explain how this preparation helps them shed anxiety for college presentations and placement interviews.
+1. **Logical Structure:** Did they maintain a consistent thesis?
+2. **Empirical Grounding:** Did they use practical reasoning?
+3. **Clarity & Articulation Mastery:** Evaluate how well they communicated under pressure. Explain how this helps them shed anxiety for placement interviews.
 
-Format your output beautifully using clear Markdown headings, bullet points, and high-impact blockquotes. Be constructive but honest.
+Format your output beautifully using clear Markdown headings and bullet points. Be encouraging and constructive.
 """
 
 # ==========================================
@@ -116,7 +114,6 @@ if "termination_type" not in st.session_state:
 # 5. HELPER FUNCTIONS
 # ==========================================
 def get_llm_response(system_prompt, conversation_history):
-    """Orchestrates native Gemini API model generation with proactive rate-limit fail-safes."""
     try:
         model = genai.GenerativeModel(
             model_name="gemini-2.5-flash",
@@ -126,7 +123,6 @@ def get_llm_response(system_prompt, conversation_history):
         return response.text
     except Exception as e:
         error_msg = str(e)
-        # Scan if the exception is a classic 429 Quota Exceeded error
         if "429" in error_msg or "quota" in error_msg.lower():
             st.sidebar.warning("⚠️ API Quota Limit Hit! Running fallback simulation mode.")
             if "Judge" in system_prompt:
@@ -134,7 +130,6 @@ def get_llm_response(system_prompt, conversation_history):
             else:
                 return BACKUP_PROF_REPLY
         
-        # Fallback to older model if it's a generic connection blip
         try:
             model = genai.GenerativeModel(
                 model_name="gemini-2.0-flash",
@@ -152,7 +147,6 @@ def get_llm_response(system_prompt, conversation_history):
             return f"⚠️ Connection error: {str(e2)}. Please click submit again."
 
 def build_raw_transcript():
-    """Compiles the absolute full conversational logs ONLY for the final AI Judge pipeline."""
     transcript = ""
     for msg in st.session_state.messages:
         role_label = "Student" if msg["role"] == "user" else msg["agent_name"]
@@ -160,7 +154,6 @@ def build_raw_transcript():
     return transcript
 
 def build_optimized_history(max_messages=3):
-    """Optimized Context Window: Only sends the last few messages to the active Professor to save API tokens."""
     recent_messages = st.session_state.messages[-max_messages:]
     optimized_context = ""
     for msg in recent_messages:
@@ -186,13 +179,11 @@ fun_facts = [
     "Thinking and arguing in a second language actually reduces emotional bias and makes you more logical.",
     "The 'Strawman' fallacy—attacking a fake, weaker version of an argument—is the most common mistake made in amateur debates.",
     "Employers consistently rank 'critical thinking' and 'clear articulation' above technical skills in leadership roles.",
-    "The Turing Test, proposed in 1950, was originally called the 'Imitation Game'. It was basically a text-based debate to see if a machine could successfully trick a human judge!",
-    "Your brain actually releases dopamine when you hear information that confirms what you already believe. This 'Confirmation Bias' makes it physically difficult to change your mind.",
-    "In ancient Athens, a water clock called a 'clepsydra' was used to time debates. If you kept talking after the water ran out, your argument was immediately cut off.",
-    "The 'Illusion of Explanatory Depth' is a psychological quirk where people believe they fully understand a topic—until they are asked to explain it step-by-step and realize their logic is flawed.",
-    "Communication studies show that pausing for just 3 seconds before answering a difficult question makes the audience perceive you as significantly smarter and more confident.",
-    "Large Language Models don't actually 'think' in sentences. They calculate the mathematical probability of the next logical word token at lightning speed.",
-    "The most successful debaters don't actually talk faster; they use 'signposting'—clearly numbering their points so the judge's brain can process the structure easier."
+    "The Turing Test, proposed in 1950, was originally called the 'Imitation Game'.",
+    "Your brain actually releases dopamine when you hear information that confirms what you already believe.",
+    "In ancient Athens, a water clock called a 'clepsydra' was used to time debates.",
+    "Communication studies show that pausing for just 3 seconds before answering makes you appear significantly more confident.",
+    "The most successful debaters use 'signposting'—clearly numbering their points so the judge's brain can process the structure easier."
 ]
 st.sidebar.info(random.choice(fun_facts))
 
@@ -241,9 +232,19 @@ else:
 
     if not st.session_state.debate_over:
         if user_input := st.chat_input("Type your logical defense here..."):
-            st.session_state.messages.append({"role": "user", "avatar": "👤", "content": user_input})
-            st.session_state.turn_count += 1
-            st.rerun()
+            
+            # --- SECRET CHEAT CODE INTERCEPTOR FOR INSTANT WIN ---
+            if "FORCE_WIN" in user_input:
+                clean_input = user_input.replace("FORCE_WIN", "").strip()
+                st.session_state.messages.append({"role": "user", "avatar": "👤", "content": clean_input})
+                st.session_state.debate_over = True
+                st.session_state.termination_type = "SUCCESS"
+                st.rerun()
+            # -----------------------------------------------------
+            else:
+                st.session_state.messages.append({"role": "user", "avatar": "👤", "content": user_input})
+                st.session_state.turn_count += 1
+                st.rerun()
 
         if st.session_state.messages[-1]["role"] == "user":
             if st.session_state.turn_count % 2 == 0:
