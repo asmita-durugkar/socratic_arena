@@ -2,6 +2,14 @@
 
 An interactive, AI-powered debate platform designed to sharpen critical thinking, logic, and argumentative skills in students. By moving away from passive multiple-choice learning, this platform introduces a dynamic, pressure-tested environment where users must defend their stances against specialized, opposing AI personas.
 
+### 📺 https://drive.google.com/file/d/11pDo5DlzmT4Nl5bmwW5z_lnyGTSc40KA/view?usp=sharing
+
+## 🚀 The Problem
+Brilliant engineering students often possess the technical knowledge required for the corporate world, but freeze up or fumble their articulation during high-stakes placement interviews. Passive multiple-choice learning does not prepare students for the pressure of real-time, unstructured cross-examination.
+
+## 💡 The Solution
+The Socratic Defense Arena is an AI-powered debate simulator designed to sharpen critical thinking, logic, and argumentative skills. By moving away from passive learning, this platform introduces a dynamic, pressure-tested environment where users must defend their stances against specialized, opposing AI personas to build presentation-ready communication confidence.
+
 ---
 
 ## 🚀 Key Features
