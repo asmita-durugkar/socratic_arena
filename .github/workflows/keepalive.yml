@@ -1,0 +1,31 @@
+name: Streamlit Keep-Alive Ghost Commit
+
+on:
+  schedule:
+    # Runs automatically every day at midnight UTC
+    - cron: "0 0 * * *"
+  workflow_dispatch: # Allows you to run it manually from the Actions tab if needed
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    permissions:
+      # Grants the bot permission to push code to your repo
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Create or Update Keep-Alive File
+        run: |
+          # Writes the current date and time to a hidden file
+          date > .streamlit_keepalive
+          
+          # Sets up the Git bot identity
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Commits and pushes the change
+          git add .streamlit_keepalive
+          git commit -m "Ghost commit to keep Streamlit awake" || echo "No changes to commit"
+          git push
