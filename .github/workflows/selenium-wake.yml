@@ -1,0 +1,49 @@
+name: Selenium Browser Wake Up
+
+on:
+  schedule:
+    # Runs automatically every 12 hours
+    - cron: "0 */12 * * *"
+  workflow_dispatch:
+
+jobs:
+  wake-app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install Selenium
+        run: pip install selenium
+        
+      - name: Run Headless Browser Visit
+        run: |
+          python -c "
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          import time
+          
+          # App URL - REPLACE THIS WITH YOUR ARENA STREAMLIT LINK
+          APP_URL = 'https://socraticarena-epbt6lrcxs3sly49xgndjj.streamlit.app/'
+          
+          print('Spinning up Chrome browser...')
+          options = Options()
+          options.add_argument('--headless')
+          options.add_argument('--no-sandbox')
+          options.add_argument('--disable-dev-shm-usage')
+          
+          driver = webdriver.Chrome(options=options)
+          
+          try:
+              print(f'Visiting {APP_URL}...')
+              driver.get(APP_URL)
+              # Wait 15 seconds to allow Streamlit to fully load
+              time.sleep(15)
+              print('Successfully rendered the app. Streamlit timer reset.')
+          except Exception as e:
+              print(f'Error: {e}')
+          finally:
+              driver.quit()
+          "
